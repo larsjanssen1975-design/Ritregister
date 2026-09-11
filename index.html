@@ -16,8 +16,8 @@
     --text:#f1eee6;
     --text-dim:#8d96a3;
     --accent:#e8a93a;
-    --a-color:#e5534b;
-    --a-dim:#3a2119;
+    --a-color:#4a90d9;
+    --a-dim:#152b3f;
     --b-color:#4caf6b;
     --b-dim:#183324;
     --waze-color:#7fb8e8;
@@ -179,6 +179,26 @@
   .name-edit input{margin-bottom:0;}
 
   .footer-note{text-align:center;color:var(--text-dim);font-size:11.5px;padding-top:6px;line-height:1.5;}
+  .signature{
+    text-align:center;
+    margin:26px 0 4px;
+    padding:16px 12px;
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--accent);
+    line-height:1.5;
+    letter-spacing:0.01em;
+  }
+  .signature-kicker{
+    display:inline-block;
+    margin-top:3px;
+    font-size:12px;
+    font-weight:500;
+    font-style:italic;
+    color:var(--text-dim);
+  }
 </style>
 </head>
 <body>
@@ -194,9 +214,6 @@
     <div class="driver-toggle" id="driverToggle"></div>
     <div id="syncStatus" style="display:none; font-size:11.5px; color:var(--danger); margin-top:10px; text-align:center;"></div>
   </div>
-
-  <div class="period-label" id="periodLabel"></div>
-  <div class="balance" id="balanceCard"></div>
 
   <div class="card">
     <h2>Log a trip</h2>
@@ -222,6 +239,9 @@
 
     <button class="btn-primary" id="addTripBtn">Add trip</button>
   </div>
+
+  <div class="period-label" id="periodLabel"></div>
+  <div class="balance" id="balanceCard"></div>
 
   <div class="card">
     <h2>This month's trips</h2>
@@ -310,7 +330,9 @@
     </div>
   </div>
 
-  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 11 — 11 sept</strong></p>
+  <p class="signature">Geschreven door de beste Papa van de wereld<br><span class="signature-kicker">en oh ja — ook de sterkste!</span></p>
+
+  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 14 — 11 sept</strong></p>
 
 </div>
 
@@ -1043,7 +1065,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
   document.getElementById('kmPerLiter').onchange = (e) => { data.settings.kmPerLiter = toNumber(e.target.value) || 0; renderAll(); };
 
-  const SETTINGS_PASSWORD = 'Papa1975';
+  const SETTINGS_PASSWORD = 'Twingo98';
 
   document.getElementById('settingsUnlockBtn').onclick = () => {
     const entered = document.getElementById('settingsPasswordInput').value;
