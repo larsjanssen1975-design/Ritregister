@@ -68,6 +68,19 @@
   .settle strong{color:var(--accent);}
   .settle.empty{color:var(--text-dim);}
 
+  .cost-row{margin-bottom:14px;}
+  .cost-row:last-child{margin-bottom:0;}
+  .cost-row-head{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+  .cost-name{font-size:14px;font-weight:600;flex:1;}
+  .cost-amount{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;}
+  .cost-bar-track{height:13px;border-radius:7px;background:var(--surface-2);overflow:hidden;}
+  .cost-bar-fill{height:100%;border-radius:7px;transition:width 0.5s ease;}
+  .cost-bar-fill.fill-a{background:var(--a-color);}
+  .cost-bar-fill.fill-b{background:var(--b-color);}
+  .cost-row-sub{font-size:11.5px;color:var(--text-dim);margin-top:4px;}
+  .cost-bars-compact .cost-row{margin-bottom:10px;}
+  .cost-bars-compact .cost-bar-track{height:8px;}
+
   /* ---- generic card ---- */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 16px 18px;margin-bottom:16px;}
   .card h2{font-size:12.5px;font-weight:600;color:var(--text-dim);margin:0 0 12px;letter-spacing:0.01em;}
@@ -180,16 +193,6 @@
   <div class="balance" id="balanceCard"></div>
 
   <div class="card">
-    <h2>Fuel price</h2>
-    <div class="km-display">
-      <span class="suffix">€</span>
-      <input type="text" id="fuelPriceMain" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
-      <span class="suffix">per litre</span>
-    </div>
-    <div class="fuel-hint" id="fuelPriceHint"></div>
-  </div>
-
-  <div class="card">
     <h2>Log a trip</h2>
 
     <label class="field-label">Where did you drive to?</label>
@@ -224,15 +227,27 @@
     <div id="historyList"></div>
   </div>
 
-  <details id="settingsDetails">
-    <summary>Settings & destinations</summary>
-    <div class="settings-body">
+  <div class="card">
+    <h2>Settings</h2>
+
+    <div id="settingsLocked">
+      <p class="fuel-hint" style="margin-bottom:10px;">Enter the password to change settings, the fuel price, or destinations.</p>
+      <input type="password" id="settingsPasswordInput" placeholder="Password" autocomplete="off">
+      <button class="btn-secondary" id="settingsUnlockBtn">Unlock settings</button>
+      <div id="settingsError" style="display:none; color:var(--danger); font-size:12.5px; margin-top:8px;">Incorrect password.</div>
+    </div>
+
+    <div id="settingsContent" style="display:none;">
 
       <label class="field-label">Driver names</label>
       <div class="name-edit">
         <input type="text" id="nameA">
         <input type="text" id="nameB">
       </div>
+
+      <label class="field-label">Fuel price (€ / litre)</label>
+      <input type="text" id="fuelPriceMain" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
+      <div class="fuel-hint" id="fuelPriceHint" style="margin-top:-6px; margin-bottom:10px;"></div>
 
       <label class="field-label">Car's fuel economy (km per litre)</label>
       <input type="text" id="kmPerLiter" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
@@ -272,18 +287,24 @@
         <button class="btn-secondary" id="addPastTripBtn">Add past trip</button>
       </div>
 
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+        <button class="btn-primary" id="settingsSaveBtn">Save settings</button>
+        <div id="settingsSavedNote" style="display:none; text-align:center; color:var(--a-color); font-size:12.5px; margin-top:8px;">Saved.</div>
+      </div>
+
       <div style="margin-top:18px;">
         <button class="btn-secondary" id="endMonthBtn">End this month now</button>
       </div>
     </div>
-  </details>
+  </div>
 
   <p class="footer-note">Trips and settings are stored for anyone who opens this app —<br>so both of you always see the same numbers.<br>Months reset automatically; past months stay saved below.</p>
 
 </div>
 
 <script>
-const STORAGE_KEY = 'ritregister-data-v2';
+const FIREBASE_DB_URL = 'https://ritregistratie-c20ef-default-rtdb.europe-west1.firebasedatabase.app';
+const DATA_PATH = '/ritregister.json';
 
 function defaultData(){
   return {
@@ -305,20 +326,18 @@ let selectedDriver = 'a';
 let selectedPastDriver = 'a';
 const SELECTED_DRIVER_KEY = 'ritregister-selected-driver';
 
-async function loadSelectedDriver(){
+function loadSelectedDriver(){
   try{
-    const res = await window.storage.get(SELECTED_DRIVER_KEY, false);
-    if(res && res.value && (res.value === 'a' || res.value === 'b')){
-      selectedDriver = res.value;
-    }
+    const stored = localStorage.getItem(SELECTED_DRIVER_KEY);
+    if(stored === 'a' || stored === 'b') selectedDriver = stored;
   }catch(e){
-    // nothing saved yet on this phone — keep the default
+    // localStorage unavailable — keep the default
   }
 }
 
-async function saveSelectedDriver(){
+function saveSelectedDriver(){
   try{
-    await window.storage.set(SELECTED_DRIVER_KEY, selectedDriver, false);
+    localStorage.setItem(SELECTED_DRIVER_KEY, selectedDriver);
   }catch(e){
     console.error('Could not save selected driver', e);
   }
@@ -342,25 +361,26 @@ function periodLabel(key){
   return d.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
 }
 
+function mergeIntoDefaults(parsed){
+  const merged = Object.assign(defaultData(), parsed);
+  merged.drivers = Object.assign(defaultData().drivers, parsed.drivers);
+  merged.settings = Object.assign({}, defaultData().settings, parsed.settings);
+  if(parsed.settings && parsed.settings.consumption && !parsed.settings.kmPerLiter){
+    merged.settings.kmPerLiter = 100 / parsed.settings.consumption;
+  }
+  if(!Array.isArray(merged.destinations)) merged.destinations = defaultData().destinations;
+  if(!Array.isArray(merged.trips)) merged.trips = [];
+  if(typeof merged.history !== 'object' || merged.history === null) merged.history = {};
+  return merged;
+}
+
 async function loadData(){
   try{
-    const res = await window.storage.get(STORAGE_KEY, true);
-    if(res && res.value){
-      const parsed = JSON.parse(res.value);
-      data = Object.assign(defaultData(), parsed);
-      data.drivers = Object.assign(defaultData().drivers, parsed.drivers);
-      data.settings = Object.assign({}, defaultData().settings, parsed.settings);
-      // migrate old L/100km field if present
-      if(parsed.settings && parsed.settings.consumption && !parsed.settings.kmPerLiter){
-        data.settings.kmPerLiter = 100 / parsed.settings.consumption;
-      }
-      if(!Array.isArray(data.destinations)) data.destinations = defaultData().destinations;
-      if(!Array.isArray(data.trips)) data.trips = [];
-      if(typeof data.history !== 'object' || data.history === null) data.history = {};
-    } else {
-      data = defaultData();
-    }
+    const res = await fetch(FIREBASE_DB_URL + DATA_PATH);
+    const json = await res.json();
+    data = json ? mergeIntoDefaults(json) : defaultData();
   }catch(e){
+    console.error('Could not load from Firebase, starting with defaults', e);
     data = defaultData();
   }
 
@@ -399,6 +419,31 @@ function scheduleLiveMonthRolloverCheck(){
   }, 60000);
 }
 
+function scheduleRemoteSync(){
+  // Picks up trips the other phone logged, without needing a manual refresh.
+  // Skipped while someone is actively typing or has settings open, so it
+  // never overwrites input mid-edit.
+  setInterval(async () => {
+    const active = document.activeElement;
+    const isTyping = active && ['INPUT','SELECT','TEXTAREA'].includes(active.tagName);
+    const settingsEl = document.getElementById('settingsContent');
+    const settingsOpen = settingsEl && settingsEl.style.display === 'block';
+    if(isTyping || settingsOpen) return;
+
+    try{
+      const res = await fetch(FIREBASE_DB_URL + DATA_PATH);
+      const json = await res.json();
+      if(json){
+        data = mergeIntoDefaults(json);
+        handleMonthRollover();
+        renderAll();
+      }
+    }catch(e){
+      // transient network hiccup — try again next cycle
+    }
+  }, 25000);
+}
+
 function archiveCurrentMonth(periodKey){
   if(data.trips.length === 0) return;
   const cpk = costPerKm();
@@ -412,9 +457,13 @@ function archiveCurrentMonth(periodKey){
 
 async function saveData(){
   try{
-    await window.storage.set(STORAGE_KEY, JSON.stringify(data), true);
+    await fetch(FIREBASE_DB_URL + DATA_PATH, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
   }catch(e){
-    console.error('Could not save', e);
+    console.error('Could not save to Firebase', e);
   }
 }
 
@@ -453,14 +502,32 @@ function renderPeriodLabel(){
   document.getElementById('periodLabel').textContent = periodLabel(data.currentPeriod || currentPeriodKey());
 }
 
+function costBarsHtml(costA, costB, kmA, kmB, compact){
+  const maxCost = Math.max(costA, costB, 0.01);
+  const pctA = (costA / maxCost) * 100;
+  const pctB = (costB / maxCost) * 100;
+  return `
+    <div class="${compact ? 'cost-bars-compact' : ''}">
+      <div class="cost-row">
+        <div class="cost-row-head"><span class="dot a"></span><span class="cost-name">${escapeHtml(data.drivers.a)}</span><span class="cost-amount">${fmtEur(costA)}</span></div>
+        <div class="cost-bar-track"><div class="cost-bar-fill fill-a" style="width:${pctA}%"></div></div>
+        <div class="cost-row-sub">${fmtKm(kmA)} km</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-row-head"><span class="dot b"></span><span class="cost-name">${escapeHtml(data.drivers.b)}</span><span class="cost-amount">${fmtEur(costB)}</span></div>
+        <div class="cost-bar-track"><div class="cost-bar-fill fill-b" style="width:${pctB}%"></div></div>
+        <div class="cost-row-sub">${fmtKm(kmB)} km</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderBalance(){
   const totals = totalsFor(data.trips);
   const totalKm = totals.a + totals.b;
   const cpk = costPerKm();
   const costA = totals.a * cpk;
   const costB = totals.b * cpk;
-  const pctA = totalKm > 0 ? (totals.a / totalKm) * 100 : 50;
-  const pctB = 100 - pctA;
 
   let settleHtml = '';
   if(totalKm === 0){
@@ -479,19 +546,7 @@ function renderBalance(){
   }
 
   document.getElementById('balanceCard').innerHTML = `
-    <div class="balance-row">
-      <div class="driver-block">
-        <div class="driver-name"><span class="dot a"></span>${escapeHtml(data.drivers.a)}</div>
-        <div class="driver-km">${fmtKm(totals.a)}<span>km · ${totalKm > 0 ? Math.round(pctA) : 50}%</span></div>
-        <div class="driver-cost">${fmtEur(costA)}</div>
-      </div>
-      <div class="driver-block right">
-        <div class="driver-name">${escapeHtml(data.drivers.b)}<span class="dot b"></span></div>
-        <div class="driver-km">${fmtKm(totals.b)}<span>km · ${totalKm > 0 ? Math.round(pctB) : 50}%</span></div>
-        <div class="driver-cost">${fmtEur(costB)}</div>
-      </div>
-    </div>
-    <div class="bar"><div class="bar-a" style="width:${pctA}%"></div><div class="bar-b" style="width:${pctB}%"></div></div>
+    ${costBarsHtml(costA, costB, totals.a, totals.b, false)}
     ${settleHtml}
   `;
 }
@@ -651,9 +706,6 @@ function renderHistory(){
   el.innerHTML = keys.map(key => {
     const month = data.history[key];
     const totals = totalsFor(month.trips);
-    const totalKm = totals.a + totals.b;
-    const pctA = totalKm > 0 ? (totals.a / totalKm) * 100 : 50;
-    const pctB = 100 - pctA;
     const cpk = month.costPerKm || 0;
     const costA = totals.a * cpk;
     const costB = totals.b * cpk;
@@ -669,11 +721,7 @@ function renderHistory(){
     return `
       <div class="month-row">
         <div class="month-head"><span class="m-label">${periodLabel(key)}</span></div>
-        <div class="bar" style="height:8px;margin-bottom:8px;"><div class="bar-a" style="width:${pctA}%"></div><div class="bar-b" style="width:${pctB}%"></div></div>
-        <div class="month-split">
-          <span class="who"><span class="dot a"></span>${escapeHtml(data.drivers.a)}: ${Math.round(pctA)}% · ${fmtKm(totals.a)} km · ${fmtEur(costA)}</span>
-          <span class="who">${escapeHtml(data.drivers.b)}: ${Math.round(pctB)}% · ${fmtKm(totals.b)} km · ${fmtEur(costB)}<span class="dot b"></span></span>
-        </div>
+        ${costBarsHtml(costA, costB, totals.a, totals.b, true)}
         <div class="month-settle">${settle} Total fuel cost: ${fmtEur(totalCost)}.</div>
       </div>
     `;
@@ -845,15 +893,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderAll();
   };
 
-  document.getElementById('nameA').onchange = (e) => { data.drivers.a = e.target.value.trim() || 'Koen'; saveData(); renderAll(); };
-  document.getElementById('nameB').onchange = (e) => { data.drivers.b = e.target.value.trim() || 'Thijs'; saveData(); renderAll(); };
+  document.getElementById('nameA').onchange = (e) => { data.drivers.a = e.target.value.trim() || 'Koen'; renderAll(); };
+  document.getElementById('nameB').onchange = (e) => { data.drivers.b = e.target.value.trim() || 'Thijs'; renderAll(); };
   document.getElementById('fuelPriceMain').onchange = (e) => {
     data.settings.fuelPrice = toNumber(e.target.value) || 0;
     data.settings.fuelPriceUpdated = todayIso();
-    saveData();
     renderAll();
   };
-  document.getElementById('kmPerLiter').onchange = (e) => { data.settings.kmPerLiter = toNumber(e.target.value) || 0; saveData(); renderAll(); };
+  document.getElementById('kmPerLiter').onchange = (e) => { data.settings.kmPerLiter = toNumber(e.target.value) || 0; renderAll(); };
+
+  const SETTINGS_PASSWORD = 'Papa1975';
+
+  document.getElementById('settingsUnlockBtn').onclick = () => {
+    const entered = document.getElementById('settingsPasswordInput').value;
+    if(entered === SETTINGS_PASSWORD){
+      document.getElementById('settingsLocked').style.display = 'none';
+      document.getElementById('settingsContent').style.display = 'block';
+      document.getElementById('settingsError').style.display = 'none';
+      document.getElementById('settingsPasswordInput').value = '';
+    } else {
+      document.getElementById('settingsError').style.display = 'block';
+    }
+  };
+  document.getElementById('settingsPasswordInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') document.getElementById('settingsUnlockBtn').click();
+  });
+
+  document.getElementById('settingsSaveBtn').onclick = async () => {
+    await saveData();
+    const note = document.getElementById('settingsSavedNote');
+    note.style.display = 'block';
+    setTimeout(() => { note.style.display = 'none'; }, 2000);
+  };
 
   document.getElementById('endMonthBtn').onclick = () => {
     if(data.trips.length === 0){
@@ -867,9 +938,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  await loadSelectedDriver();
+  loadSelectedDriver();
   loadData();
   scheduleLiveMonthRolloverCheck();
+  scheduleRemoteSync();
 });
 </script>
 </body>
