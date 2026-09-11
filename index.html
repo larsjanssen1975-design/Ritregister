@@ -339,7 +339,7 @@
 
   <p class="signature">Geschreven door de beste Papa van de wereld<br><span class="signature-kicker">en oh ja — ook de sterkste!</span></p>
 
-  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 19 — 11 sept</strong></p>
+  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 20 — 11 sept</strong></p>
 
 </div>
 
@@ -501,7 +501,12 @@ function scheduleRemoteSync(){
     const isTyping = active && ['INPUT','SELECT','TEXTAREA'].includes(active.tagName);
     const settingsEl = document.getElementById('settingsContent');
     const settingsOpen = settingsEl && settingsEl.style.display === 'block';
-    if(isTyping || settingsOpen) return;
+    // Also hold off while a one-off trip is half-filled in, so the refresh
+    // never wipes an entry someone is still working on.
+    const midEntry = isCustomSelected() ||
+      (document.getElementById('kmInput').value || '').trim() !== '' ||
+      (document.getElementById('customAddress').value || '').trim() !== '';
+    if(isTyping || settingsOpen || midEntry) return;
 
     try{
       const json = await fetchRemoteData(6000);
@@ -669,6 +674,7 @@ function updateWazeLink(){
 
 function renderDestSelect(){
   const sel = document.getElementById('destSelect');
+  const previous = sel.value; // keep whatever the driver had selected
   sel.innerHTML = '';
   data.destinations.forEach(d => {
     const opt = document.createElement('option');
@@ -695,7 +701,13 @@ function renderDestSelect(){
     updateWazeLink();
   };
 
-  if(data.destinations.length > 0){
+  const stillExists = previous && Array.from(sel.options).some(o => o.value === previous);
+  if(stillExists){
+    sel.value = previous;
+    if(previous === '__custom__'){
+      document.getElementById('customAddressBlock').style.display = 'block';
+    }
+  } else if(data.destinations.length > 0){
     sel.value = data.destinations[0].id;
     document.getElementById('kmInput').value = data.destinations[0].km;
   }
@@ -764,6 +776,7 @@ function renderPastDriverToggle(){
 
 function renderPastDestSelect(){
   const sel = document.getElementById('pastDestSelect');
+  const previous = sel.value;
   sel.innerHTML = '';
   data.destinations.forEach(d => {
     const opt = document.createElement('option');
@@ -789,7 +802,13 @@ function renderPastDestSelect(){
     updatePastKmMode();
   };
 
-  if(data.destinations.length > 0){
+  const stillExists = previous && Array.from(sel.options).some(o => o.value === previous);
+  if(stillExists){
+    sel.value = previous;
+    if(previous === '__custom__'){
+      document.getElementById('pastCustomBlock').style.display = 'block';
+    }
+  } else if(data.destinations.length > 0){
     sel.value = data.destinations[0].id;
     document.getElementById('pastKmInput').value = data.destinations[0].km;
   }
