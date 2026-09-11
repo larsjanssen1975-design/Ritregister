@@ -931,7 +931,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert('No trips logged this month yet — nothing to archive.');
       return;
     }
-    if(confirm('End this month now and start a fresh log? This month\\'s trips will move into "Previous months".')){
+    if(confirm('End this month now and start a fresh log? This month\'s trips will move into "Previous months".')){
       archiveCurrentMonth(data.currentPeriod);
       saveData();
       renderAll();
