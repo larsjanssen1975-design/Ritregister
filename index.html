@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ritregister</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#171b22;
+    --surface:#20262f;
+    --surface-2:#2a3140;
+    --border:#39414f;
+    --text:#f1eee6;
+    --text-dim:#8d96a3;
+    --accent:#e8a93a;
+    --a-color:#49b7a8;
+    --a-dim:#173430;
+    --b-color:#e0705a;
+    --b-dim:#3a2420;
+    --waze-color:#7fb8e8;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Archivo',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom: calc(48px + env(safe-area-inset-bottom));
+  }
+  .num{font-family:'JetBrains Mono',ui-monospace,monospace;}
+  .wrap{
+    max-width:480px;
+    margin:0 auto;
+    padding: calc(20px + env(safe-area-inset-top)) 18px 24px;
+  }
+  header{margin-bottom:6px;}
+  header h1{font-size:22px;font-weight:700;margin:0 0 3px;letter-spacing:-0.01em;}
+  header p{margin:0;color:var(--text-dim);font-size:13.5px;line-height:1.4;}
+  .period-label{
+    font-size:12.5px;
+    color:var(--accent);
+    font-weight:600;
+    margin:14px 0 8px;
+  }
+
+  /* ---- balance card ---- */
+  .balance{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 18px 16px;margin-bottom:16px;}
+  .balance-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;}
+  .driver-block{width:47%;}
+  .driver-block.right{text-align:right;}
+  .driver-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px;margin-bottom:4px;}
+  .driver-block.right .driver-name{justify-content:flex-end;}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .dot.a{background:var(--a-color);}
+  .dot.b{background:var(--b-color);}
+  .driver-km{font-size:26px;font-weight:700;line-height:1;}
+  .driver-km span{font-size:13px;color:var(--text-dim);font-weight:500;margin-left:3px;}
+  .driver-cost{font-size:13.5px;color:var(--text-dim);margin-top:5px;}
+  .bar{height:10px;border-radius:6px;background:var(--surface-2);overflow:hidden;display:flex;margin-bottom:12px;}
+  .bar-a{background:var(--a-color);height:100%;}
+  .bar-b{background:var(--b-color);height:100%;}
+  .settle{text-align:center;font-size:13.5px;color:var(--text);padding-top:10px;border-top:1px dashed var(--border);}
+  .settle strong{color:var(--accent);}
+  .settle.empty{color:var(--text-dim);}
+
+  /* ---- generic card ---- */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 16px 18px;margin-bottom:16px;}
+  .card h2{font-size:12.5px;font-weight:600;color:var(--text-dim);margin:0 0 12px;letter-spacing:0.01em;}
+  .driver-toggle{display:flex;gap:8px;margin-bottom:12px;}
+  .driver-toggle button{flex:1;padding:10px 6px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:7px;}
+  .driver-toggle button.active-a{border-color:var(--a-color);background:var(--a-dim);}
+  .driver-toggle button.active-b{border-color:var(--b-color);background:var(--b-dim);}
+
+  select, input[type=text], input[type=number], input[type=date]{
+    width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    font-family:inherit;font-size:15px;padding:11px 12px;border-radius:10px;margin-bottom:10px;
+    appearance:none;-webkit-appearance:none;
+  }
+  select:focus, input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  label.field-label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:5px;margin-top:2px;}
+  .row2{display:flex; gap:10px;}
+  .row2 > div{flex:1;}
+
+  .km-display{display:flex;align-items:baseline;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;margin-bottom:12px;}
+  .km-display input{border:none;background:none;padding:0;margin:0;font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);width:100%;}
+  .km-display input:focus{outline:none;}
+  .km-display .suffix{color:var(--text-dim); font-size:14px;}
+
+  .fuel-hint{font-size:12px;color:var(--text-dim);}
+
+  .waze-btn{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--surface-2);border:1px solid var(--border);color:var(--waze-color);
+    font-family:inherit;font-size:12.5px;font-weight:600;
+    padding:7px 12px;border-radius:8px;cursor:pointer;text-decoration:none;
+    margin-bottom:12px;
+  }
+  .waze-btn:before{content:'';width:7px;height:7px;border-radius:50%;background:var(--waze-color);display:inline-block;}
+
+  .btn-primary{width:100%;background:var(--accent);color:#1c1406;border:none;padding:13px;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;}
+  .btn-primary:active{opacity:0.85;}
+  .btn-secondary{width:100%;background:transparent;color:var(--text);border:1px solid var(--border);padding:11px;border-radius:10px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;}
+
+  /* ---- trip log ---- */
+  .log-item{display:flex;align-items:center;gap:11px;padding:11px 2px;border-bottom:1px solid var(--border);}
+  .log-item:last-child{border-bottom:none;}
+  .log-dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .log-main{flex:1; min-width:0;}
+  .log-dest{font-size:14.5px;font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .log-meta{font-size:12px;color:var(--text-dim);margin-top:1px;}
+  .log-km{font-family:'JetBrains Mono',monospace;font-size:14.5px;font-weight:700;text-align:right;flex:none;}
+  .log-km span{display:block;font-size:11px;color:var(--text-dim);font-weight:500;font-family:'Archivo',sans-serif;}
+  .log-del{background:none;border:none;color:var(--text-dim);font-size:18px; padding:2px 4px; cursor:pointer; flex:none;line-height:1;}
+  .empty-state{text-align:center;color:var(--text-dim);font-size:13.5px;padding:22px 10px;}
+
+  /* ---- history ---- */
+  .month-row{padding:12px 2px;border-bottom:1px solid var(--border);}
+  .month-row:last-child{border-bottom:none;}
+  .month-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+  .month-head .m-label{font-size:14px;font-weight:700;}
+  .month-split{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-dim);}
+  .month-split .who{display:flex;align-items:center;gap:6px;}
+  .month-settle{font-size:12px;color:var(--text-dim);margin-top:6px;}
+  .month-settle strong{color:var(--accent);}
+
+  /* ---- settings ---- */
+  details{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;}
+  summary{padding:14px 16px;font-size:13.5px;font-weight:600;color:var(--text-dim);cursor:pointer;list-style:none;}
+  summary::-webkit-details-marker{display:none;}
+  summary:after{content:'⌄'; float:right; color:var(--text-dim);}
+  details[open] summary:after{content:'⌃';}
+  .settings-body{padding:0 16px 18px;}
+  .dest-row{padding:9px 0;border-bottom:1px solid var(--border);}
+  .dest-row:last-of-type{border-bottom:none;}
+  .dest-row-top{display:flex; align-items:center; gap:8px;}
+  .dest-row .name{flex:1; font-size:14px;}
+  .dest-row .km-tag{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-dim);}
+  .dest-row button.del{background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;padding:2px 4px;}
+  .dest-row .waze-btn{margin:6px 0 0; padding:5px 10px; font-size:11.5px;}
+  .add-dest{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;}
+  .add-dest input{margin-bottom:0;}
+  .add-dest .n1{flex:1 1 100%;}
+  .add-dest .n2{flex:1;}
+  .add-dest .n3{flex:0 0 70px;}
+  .add-dest button{flex:none; background:var(--surface-2); border:1px solid var(--border); color:var(--accent);border-radius:10px; padding:0 14px; font-size:20px; font-weight:600; cursor:pointer;}
+  .name-edit{display:flex; gap:8px; margin-bottom:10px;}
+  .name-edit input{margin-bottom:0;}
+
+  .footer-note{text-align:center;color:var(--text-dim);font-size:11.5px;padding-top:6px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Ritregister</h1>
+    <p>Log every trip, split the fuel fairly. No more arguing over who drove more.</p>
+  </header>
+
+  <div class="period-label" id="periodLabel"></div>
+  <div class="balance" id="balanceCard"></div>
+
+  <div class="card">
+    <h2>Fuel price</h2>
+    <div class="km-display">
+      <span class="suffix">€</span>
+      <input type="number" step="0.01" id="fuelPriceMain" inputmode="decimal">
+      <span class="suffix">per litre</span>
+    </div>
+    <div class="fuel-hint" id="fuelPriceHint"></div>
+  </div>
+
+  <div class="card">
+    <h2>Log a trip</h2>
+    <div class="driver-toggle" id="driverToggle"></div>
+
+    <label class="field-label">Where did you drive to?</label>
+    <select id="destSelect"></select>
+
+    <div id="customAddressBlock" style="display:none;">
+      <label class="field-label">Address or place name</label>
+      <input type="text" id="customAddress" placeholder="e.g. Stationsplein 1, Apeldoorn">
+    </div>
+
+    <a id="wazeLink" class="waze-btn" href="#" target="_blank" rel="noopener">Open in Waze to check the km</a>
+
+    <label class="field-label">Kilometres</label>
+    <div class="km-display">
+      <input type="number" id="kmInput" inputmode="decimal" placeholder="0">
+      <span class="suffix">km</span>
+    </div>
+
+    <label class="field-label">Date</label>
+    <input type="date" id="dateInput">
+
+    <button class="btn-primary" id="addTripBtn">Add trip</button>
+  </div>
+
+  <div class="card">
+    <h2>This month's trips</h2>
+    <div id="tripLog"></div>
+  </div>
+
+  <div class="card">
+    <h2>Previous months</h2>
+    <div id="historyList"></div>
+  </div>
+
+  <details id="settingsDetails">
+    <summary>Settings & destinations</summary>
+    <div class="settings-body">
+
+      <label class="field-label">Driver names</label>
+      <div class="name-edit">
+        <input type="text" id="nameA">
+        <input type="text" id="nameB">
+      </div>
+
+      <label class="field-label">Car's fuel economy (km per litre)</label>
+      <input type="number" step="0.5" id="kmPerLiter" inputmode="decimal">
+
+      <label class="field-label" style="margin-top:6px;">Saved destinations</label>
+      <p class="fuel-hint" style="margin-bottom:8px;">Give the address or place name your son would enter in Waze — enter the one-way distance and it doubles it for the round trip.</p>
+      <div id="destList"></div>
+      <div class="add-dest">
+        <input type="text" class="n1" id="newDestName" placeholder="Address or place name (e.g. Mara)">
+        <input type="number" class="n2" id="newDestKm" placeholder="One-way km" inputmode="decimal">
+        <button id="addDestBtn">+</button>
+      </div>
+
+      <div style="margin-top:18px;">
+        <button class="btn-secondary" id="endMonthBtn">End this month now</button>
+      </div>
+    </div>
+  </details>
+
+  <p class="footer-note">Trips and settings are stored for anyone who opens this app —<br>so both of you always see the same numbers.<br>Months reset automatically; past months stay saved below.</p>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'ritregister-data-v2';
+
+function defaultData(){
+  return {
+    drivers: { a: 'Koen', b: 'Thijs' },
+    settings: { fuelPrice: 1.95, kmPerLiter: 15 },
+    destinations: [
+      { id: 'd1', name: 'Mara', oneWay: 40.5, km: 81 },
+      { id: 'd2', name: 'Werk', oneWay: 6.2, km: 12.4 },
+      { id: 'd3', name: 'Gym', oneWay: 3.3, km: 6.6 }
+    ],
+    currentPeriod: null,
+    trips: [],
+    history: {}
+  };
+}
+
+let data = null;
+let selectedDriver = 'a';
+let idCounter = 1;
+
+function uid(){ idCounter += 1; return 't' + Date.now() + idCounter; }
+
+function currentPeriodKey(){
+  return todayIso().slice(0,7); // YYYY-MM
+}
+
+function periodLabel(key){
+  const [y,m] = key.split('-').map(Number);
+  const d = new Date(y, m-1, 1);
+  return d.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+}
+
+async function loadData(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      data = Object.assign(defaultData(), parsed);
+      data.drivers = Object.assign(defaultData().drivers, parsed.drivers);
+      data.settings = Object.assign({}, defaultData().settings, parsed.settings);
+      // migrate old L/100km field if present
+      if(parsed.settings && parsed.settings.consumption && !parsed.settings.kmPerLiter){
+        data.settings.kmPerLiter = 100 / parsed.settings.consumption;
+      }
+      if(!Array.isArray(data.destinations)) data.destinations = defaultData().destinations;
+      if(!Array.isArray(data.trips)) data.trips = [];
+      if(typeof data.history !== 'object' || data.history === null) data.history = {};
+    } else {
+      data = defaultData();
+    }
+  }catch(e){
+    data = defaultData();
+  }
+
+  handleMonthRollover();
+  renderAll();
+}
+
+function handleMonthRollover(){
+  const nowKey = currentPeriodKey();
+  if(!data.currentPeriod){
+    data.currentPeriod = nowKey;
+    saveData();
+    return;
+  }
+  if(data.currentPeriod !== nowKey){
+    archiveCurrentMonth(data.currentPeriod);
+    data.currentPeriod = nowKey;
+    saveData();
+  }
+}
+
+function archiveCurrentMonth(periodKey){
+  if(data.trips.length === 0) return;
+  const cpk = costPerKm();
+  if(!data.history[periodKey]){
+    data.history[periodKey] = { trips: [], costPerKm: cpk };
+  }
+  data.history[periodKey].trips = data.history[periodKey].trips.concat(data.trips);
+  data.history[periodKey].costPerKm = cpk;
+  data.trips = [];
+}
+
+async function saveData(){
+  try{
+    await window.storage.set(STORAGE_KEY, JSON.stringify(data), true);
+  }catch(e){
+    console.error('Could not save', e);
+  }
+}
+
+function costPerKm(){
+  const s = data.settings;
+  if(!s.kmPerLiter) return 0;
+  return s.fuelPrice / s.kmPerLiter;
+}
+
+function totalsFor(trips){
+  const totals = { a: 0, b: 0 };
+  trips.forEach(t => { totals[t.driver] += t.km; });
+  return totals;
+}
+
+function fmtKm(n){ return (Math.round(n * 10) / 10).toLocaleString('en-US', {maximumFractionDigits:1}); }
+function fmtEur(n){ return '€' + (Math.round(n * 100) / 100).toFixed(2); }
+
+function renderPeriodLabel(){
+  document.getElementById('periodLabel').textContent = periodLabel(data.currentPeriod || currentPeriodKey());
+}
+
+function renderBalance(){
+  const totals = totalsFor(data.trips);
+  const totalKm = totals.a + totals.b;
+  const cpk = costPerKm();
+  const costA = totals.a * cpk;
+  const costB = totals.b * cpk;
+  const pctA = totalKm > 0 ? (totals.a / totalKm) * 100 : 50;
+  const pctB = 100 - pctA;
+
+  let settleHtml = '';
+  if(totalKm === 0){
+    settleHtml = `<div class="settle empty">Log your first trip to see the split.</div>`;
+  } else {
+    const totalCost = costA + costB;
+    const fairShare = totalCost / 2;
+    const diff = costA - fairShare;
+    if(Math.abs(diff) < 0.05){
+      settleHtml = `<div class="settle">Evenly split — no one owes anything.</div>`;
+    } else if(diff > 0){
+      settleHtml = `<div class="settle"><strong>${escapeHtml(data.drivers.a)}</strong> has driven ${fmtEur(diff)} more than a fair share — ${escapeHtml(data.drivers.b)} can cover that much less next tank.</div>`;
+    } else {
+      settleHtml = `<div class="settle"><strong>${escapeHtml(data.drivers.b)}</strong> has driven ${fmtEur(Math.abs(diff))} more than a fair share — ${escapeHtml(data.drivers.a)} can cover that much less next tank.</div>`;
+    }
+  }
+
+  document.getElementById('balanceCard').innerHTML = `
+    <div class="balance-row">
+      <div class="driver-block">
+        <div class="driver-name"><span class="dot a"></span>${escapeHtml(data.drivers.a)}</div>
+        <div class="driver-km">${fmtKm(totals.a)}<span>km · ${totalKm > 0 ? Math.round(pctA) : 50}%</span></div>
+        <div class="driver-cost">${fmtEur(costA)}</div>
+      </div>
+      <div class="driver-block right">
+        <div class="driver-name">${escapeHtml(data.drivers.b)}<span class="dot b"></span></div>
+        <div class="driver-km">${fmtKm(totals.b)}<span>km · ${totalKm > 0 ? Math.round(pctB) : 50}%</span></div>
+        <div class="driver-cost">${fmtEur(costB)}</div>
+      </div>
+    </div>
+    <div class="bar"><div class="bar-a" style="width:${pctA}%"></div><div class="bar-b" style="width:${pctB}%"></div></div>
+    ${settleHtml}
+  `;
+}
+
+function renderDriverToggle(){
+  const el = document.getElementById('driverToggle');
+  el.innerHTML = `
+    <button id="btnDriverA" class="${selectedDriver==='a' ? 'active-a' : ''}"><span class="dot a"></span>${escapeHtml(data.drivers.a)}</button>
+    <button id="btnDriverB" class="${selectedDriver==='b' ? 'active-b' : ''}"><span class="dot b"></span>${escapeHtml(data.drivers.b)}</button>
+  `;
+  document.getElementById('btnDriverA').onclick = () => { selectedDriver = 'a'; renderDriverToggle(); };
+  document.getElementById('btnDriverB').onclick = () => { selectedDriver = 'b'; renderDriverToggle(); };
+}
+
+function wazeUrl(address){
+  return 'https://waze.com/ul?q=' + encodeURIComponent(address) + '&navigate=yes';
+}
+
+function updateWazeLink(){
+  const sel = document.getElementById('destSelect');
+  const link = document.getElementById('wazeLink');
+  let address = '';
+  if(sel.value === '__custom__'){
+    address = document.getElementById('customAddress').value.trim();
+  } else {
+    const d = data.destinations.find(x => x.id === sel.value);
+    address = d ? d.name : '';
+  }
+  if(address){
+    link.href = wazeUrl(address);
+    link.style.opacity = '1';
+    link.style.pointerEvents = 'auto';
+  } else {
+    link.href = '#';
+    link.style.opacity = '0.5';
+    link.style.pointerEvents = 'none';
+  }
+}
+
+function renderDestSelect(){
+  const sel = document.getElementById('destSelect');
+  sel.innerHTML = '';
+  data.destinations.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = `${d.name} — ${fmtKm(d.km)} km`;
+    sel.appendChild(opt);
+  });
+  const custom = document.createElement('option');
+  custom.value = '__custom__';
+  custom.textContent = 'Other (enter km manually)';
+  sel.appendChild(custom);
+
+  sel.onchange = () => {
+    const customBlock = document.getElementById('customAddressBlock');
+    if(sel.value === '__custom__'){
+      customBlock.style.display = 'block';
+      document.getElementById('kmInput').value = '';
+    } else {
+      customBlock.style.display = 'none';
+      const d = data.destinations.find(x => x.id === sel.value);
+      if(d) document.getElementById('kmInput').value = d.km;
+    }
+    updateWazeLink();
+  };
+
+  if(data.destinations.length > 0){
+    sel.value = data.destinations[0].id;
+    document.getElementById('kmInput').value = data.destinations[0].km;
+  }
+  updateWazeLink();
+}
+
+function renderTripLog(){
+  const el = document.getElementById('tripLog');
+  if(data.trips.length === 0){
+    el.innerHTML = `<div class="empty-state">No trips logged this month yet.</div>`;
+    return;
+  }
+  const cpk = costPerKm();
+  const sorted = [...data.trips].sort((a,b) => (b.date + b.id).localeCompare(a.date + a.id));
+  el.innerHTML = sorted.map(t => {
+    const name = t.driver === 'a' ? data.drivers.a : data.drivers.b;
+    const dot = t.driver === 'a' ? 'a' : 'b';
+    const dateLabel = formatDateShort(t.date);
+    return `
+      <div class="log-item">
+        <div class="log-dot dot ${dot}"></div>
+        <div class="log-main">
+          <div class="log-dest">${escapeHtml(t.label)}</div>
+          <div class="log-meta">${escapeHtml(name)} · ${dateLabel}</div>
+        </div>
+        <div class="log-km">${fmtKm(t.km)}<span>${fmtEur(t.km * cpk)}</span></div>
+        <button class="log-del" data-id="${t.id}">×</button>
+      </div>
+    `;
+  }).join('');
+
+  el.querySelectorAll('.log-del').forEach(btn => {
+    btn.onclick = () => {
+      data.trips = data.trips.filter(t => t.id !== btn.dataset.id);
+      saveData();
+      renderAll();
+    };
+  });
+}
+
+function renderHistory(){
+  const el = document.getElementById('historyList');
+  const keys = Object.keys(data.history).sort().reverse();
+  if(keys.length === 0){
+    el.innerHTML = `<div class="empty-state">Past months will show up here once one ends.</div>`;
+    return;
+  }
+  el.innerHTML = keys.map(key => {
+    const month = data.history[key];
+    const totals = totalsFor(month.trips);
+    const totalKm = totals.a + totals.b;
+    const pctA = totalKm > 0 ? (totals.a / totalKm) * 100 : 50;
+    const pctB = 100 - pctA;
+    const cpk = month.costPerKm || 0;
+    const costA = totals.a * cpk;
+    const costB = totals.b * cpk;
+    const totalCost = costA + costB;
+    const fairShare = totalCost / 2;
+    const diff = costA - fairShare;
+    let settle = 'Evenly split.';
+    if(Math.abs(diff) >= 0.05){
+      settle = diff > 0
+        ? `<strong>${escapeHtml(data.drivers.a)}</strong> drove ${fmtEur(diff)} more than a fair share.`
+        : `<strong>${escapeHtml(data.drivers.b)}</strong> drove ${fmtEur(Math.abs(diff))} more than a fair share.`;
+    }
+    return `
+      <div class="month-row">
+        <div class="month-head"><span class="m-label">${periodLabel(key)}</span></div>
+        <div class="bar" style="height:8px;margin-bottom:8px;"><div class="bar-a" style="width:${pctA}%"></div><div class="bar-b" style="width:${pctB}%"></div></div>
+        <div class="month-split">
+          <span class="who"><span class="dot a"></span>${escapeHtml(data.drivers.a)}: ${Math.round(pctA)}% · ${fmtKm(totals.a)} km · ${fmtEur(costA)}</span>
+          <span class="who">${escapeHtml(data.drivers.b)}: ${Math.round(pctB)}% · ${fmtKm(totals.b)} km · ${fmtEur(costB)}<span class="dot b"></span></span>
+        </div>
+        <div class="month-settle">${settle} Total fuel cost: ${fmtEur(totalCost)}.</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function formatDateShort(iso){
+  if(!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  if(isNaN(d)) return iso;
+  return d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+}
+
+function renderDestList(){
+  const el = document.getElementById('destList');
+  if(data.destinations.length === 0){
+    el.innerHTML = `<div class="empty-state" style="padding:10px 0;">No saved destinations yet.</div>`;
+    return;
+  }
+  el.innerHTML = data.destinations.map(d => `
+    <div class="dest-row">
+      <div class="dest-row-top">
+        <div class="name">${escapeHtml(d.name)}</div>
+        <div class="km-tag">${fmtKm(d.km)} km${d.oneWay ? ` <span style="opacity:.6;">(2× ${fmtKm(d.oneWay)})</span>` : ''}</div>
+        <button class="del" data-id="${d.id}">×</button>
+      </div>
+      <a class="waze-btn" href="${wazeUrl(d.name)}" target="_blank" rel="noopener">Check in Waze</a>
+    </div>
+  `).join('');
+  el.querySelectorAll('button.del').forEach(btn => {
+    btn.onclick = () => {
+      data.destinations = data.destinations.filter(d => d.id !== btn.dataset.id);
+      saveData();
+      renderDestList();
+      renderDestSelect();
+    };
+  });
+}
+
+function renderSettingsFields(){
+  document.getElementById('nameA').value = data.drivers.a;
+  document.getElementById('nameB').value = data.drivers.b;
+  document.getElementById('kmPerLiter').value = data.settings.kmPerLiter;
+}
+
+function renderFuelPrice(){
+  document.getElementById('fuelPriceMain').value = data.settings.fuelPrice;
+  const hintEl = document.getElementById('fuelPriceHint');
+  if(data.settings.fuelPriceUpdated){
+    hintEl.textContent = 'Last changed ' + formatDateShort(data.settings.fuelPriceUpdated);
+  } else {
+    hintEl.textContent = 'Tip: update this whenever you fill up, so the split stays accurate.';
+  }
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str == null ? '' : String(str);
+  return d.innerHTML;
+}
+
+function renderAll(){
+  renderPeriodLabel();
+  renderBalance();
+  renderDriverToggle();
+  renderDestSelect();
+  renderTripLog();
+  renderHistory();
+  renderDestList();
+  renderSettingsFields();
+  renderFuelPrice();
+}
+
+function todayIso(){
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off*60000);
+  return local.toISOString().slice(0,10);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('dateInput').value = todayIso();
+  document.getElementById('customAddress').oninput = updateWazeLink;
+
+  document.getElementById('addTripBtn').onclick = () => {
+    const km = parseFloat(document.getElementById('kmInput').value);
+    if(!km || km <= 0){
+      document.getElementById('kmInput').focus();
+      return;
+    }
+    const sel = document.getElementById('destSelect');
+    let label;
+    if(sel.value === '__custom__'){
+      const addr = document.getElementById('customAddress').value.trim();
+      label = addr || 'Custom trip';
+    } else {
+      const d = data.destinations.find(x => x.id === sel.value);
+      label = d ? d.name : 'Trip';
+    }
+    const date = document.getElementById('dateInput').value || todayIso();
+
+    data.trips.push({ id: uid(), driver: selectedDriver, label, km, date });
+    saveData();
+    document.getElementById('kmInput').value = '';
+    document.getElementById('customAddress').value = '';
+    if(sel.value !== '__custom__'){
+      const d = data.destinations.find(x => x.id === sel.value);
+      if(d) document.getElementById('kmInput').value = d.km;
+    }
+    renderAll();
+  };
+
+  document.getElementById('addDestBtn').onclick = () => {
+    const name = document.getElementById('newDestName').value.trim();
+    const oneWay = parseFloat(document.getElementById('newDestKm').value);
+    if(!name || !oneWay || oneWay <= 0) return;
+    data.destinations.push({ id: uid(), name, oneWay, km: oneWay * 2 });
+    document.getElementById('newDestName').value = '';
+    document.getElementById('newDestKm').value = '';
+    saveData();
+    renderDestList();
+    renderDestSelect();
+  };
+
+  document.getElementById('nameA').onchange = (e) => { data.drivers.a = e.target.value.trim() || 'Koen'; saveData(); renderAll(); };
+  document.getElementById('nameB').onchange = (e) => { data.drivers.b = e.target.value.trim() || 'Thijs'; saveData(); renderAll(); };
+  document.getElementById('fuelPriceMain').onchange = (e) => {
+    data.settings.fuelPrice = parseFloat(e.target.value) || 0;
+    data.settings.fuelPriceUpdated = todayIso();
+    saveData();
+    renderAll();
+  };
+  document.getElementById('kmPerLiter').onchange = (e) => { data.settings.kmPerLiter = parseFloat(e.target.value) || 0; saveData(); renderAll(); };
+
+  document.getElementById('endMonthBtn').onclick = () => {
+    if(data.trips.length === 0){
+      alert('No trips logged this month yet — nothing to archive.');
+      return;
+    }
+    if(confirm('End this month now and start a fresh log? This month\\'s trips will move into "Previous months".')){
+      archiveCurrentMonth(data.currentPeriod);
+      saveData();
+      renderAll();
+    }
+  };
+
+  loadData();
+});
+</script>
+</body>
+</html>
