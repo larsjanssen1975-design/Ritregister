@@ -77,7 +77,8 @@
   .cost-bar-fill{height:100%;border-radius:7px;transition:width 0.5s ease;}
   .cost-bar-fill.fill-a{background:var(--a-color);}
   .cost-bar-fill.fill-b{background:var(--b-color);}
-  .cost-row-sub{font-size:11.5px;color:var(--text-dim);margin-top:4px;}
+  .cost-row-sub{font-size:11.5px;color:var(--text-dim);margin-top:4px;display:flex;justify-content:space-between;align-items:baseline;}
+  .cost-pct{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--text);}
   .cost-bars-compact .cost-row{margin-bottom:10px;}
   .cost-bars-compact .cost-bar-track{height:8px;}
 
@@ -338,7 +339,7 @@
 
   <p class="signature">Geschreven door de beste Papa van de wereld<br><span class="signature-kicker">en oh ja — ook de sterkste!</span></p>
 
-  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 18 — 11 sept</strong></p>
+  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 19 — 11 sept</strong></p>
 
 </div>
 
@@ -576,19 +577,24 @@ function renderPeriodLabel(){
 
 function costBarsHtml(costA, costB, kmA, kmB, compact){
   const maxCost = Math.max(costA, costB, 0.01);
-  const pctA = (costA / maxCost) * 100;
-  const pctB = (costB / maxCost) * 100;
+  // Bar width is relative to the bigger spender, so the longer bar always
+  // fills the track. The percentage is the driver's share of the total.
+  const widthA = (costA / maxCost) * 100;
+  const widthB = (costB / maxCost) * 100;
+  const totalCost = costA + costB;
+  const shareA = totalCost > 0 ? Math.round((costA / totalCost) * 100) : 0;
+  const shareB = totalCost > 0 ? 100 - shareA : 0;
   return `
     <div class="${compact ? 'cost-bars-compact' : ''}">
       <div class="cost-row">
         <div class="cost-row-head"><span class="dot a"></span><span class="cost-name">${escapeHtml(data.drivers.a)}</span><span class="cost-amount">${fmtEur(costA)}</span></div>
-        <div class="cost-bar-track"><div class="cost-bar-fill fill-a" style="width:${pctA}%"></div></div>
-        <div class="cost-row-sub">${fmtKm(kmA)} km</div>
+        <div class="cost-bar-track"><div class="cost-bar-fill fill-a" style="width:${widthA}%"></div></div>
+        <div class="cost-row-sub"><span>${fmtKm(kmA)} km</span><span class="cost-pct">${shareA}%</span></div>
       </div>
       <div class="cost-row">
         <div class="cost-row-head"><span class="dot b"></span><span class="cost-name">${escapeHtml(data.drivers.b)}</span><span class="cost-amount">${fmtEur(costB)}</span></div>
-        <div class="cost-bar-track"><div class="cost-bar-fill fill-b" style="width:${pctB}%"></div></div>
-        <div class="cost-row-sub">${fmtKm(kmB)} km</div>
+        <div class="cost-bar-track"><div class="cost-bar-fill fill-b" style="width:${widthB}%"></div></div>
+        <div class="cost-row-sub"><span>${fmtKm(kmB)} km</span><span class="cost-pct">${shareB}%</span></div>
       </div>
     </div>
   `;
