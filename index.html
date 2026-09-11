@@ -332,7 +332,7 @@
 
   <p class="signature">Geschreven door de beste Papa van de wereld<br><span class="signature-kicker">en oh ja — ook de sterkste!</span></p>
 
-  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 14 — 11 sept</strong></p>
+  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 15 — 11 sept</strong></p>
 
 </div>
 
@@ -748,18 +748,9 @@ function renderTripLog(){
           <div class="log-meta">${escapeHtml(name)} · ${dateLabel}</div>
         </div>
         <div class="log-km">${fmtKm(t.km)}<span>${fmtEur(t.km * cpk)}</span></div>
-        <button class="log-del" data-id="${t.id}">×</button>
       </div>
     `;
   }).join('');
-
-  el.querySelectorAll('.log-del').forEach(btn => {
-    btn.onclick = () => {
-      data.trips = data.trips.filter(t => t.id !== btn.dataset.id);
-      saveData();
-      renderAll();
-    };
-  });
 }
 
 function renderHistory(){
