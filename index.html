@@ -164,6 +164,11 @@
   .dest-row .km-tag{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-dim);}
   .dest-row button.del{background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;padding:2px 4px;}
   .dest-row .waze-btn{margin:6px 0 0; padding:5px 10px; font-size:11.5px;}
+  .dest-edit-row{display:flex; align-items:center; gap:6px;}
+  .dest-edit-row input{margin-bottom:0; padding:8px 10px; font-size:14px;}
+  .dest-edit-row .dest-name-input{flex:1; min-width:0;}
+  .dest-edit-row .dest-km-input{flex:0 0 72px; text-align:right; font-family:'JetBrains Mono',monospace;}
+  .dest-edit-row .km-unit{font-size:12px; color:var(--text-dim); flex:none;}
   .add-dest{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;}
   .add-dest input{margin-bottom:0;}
   .add-dest .n1{flex:1 1 100%;}
@@ -187,6 +192,7 @@
   <div class="card" id="whoCard">
     <h2>Who's driving?</h2>
     <div class="driver-toggle" id="driverToggle"></div>
+    <div id="syncStatus" style="display:none; font-size:11.5px; color:var(--danger); margin-top:10px; text-align:center;"></div>
   </div>
 
   <div class="period-label" id="periodLabel"></div>
@@ -195,7 +201,7 @@
   <div class="card">
     <h2>Log a trip</h2>
 
-    <label class="field-label">Where did you drive to?</label>
+    <label class="field-label">Destination</label>
     <select id="destSelect"></select>
 
     <div id="customAddressBlock" style="display:none;">
@@ -253,11 +259,11 @@
       <input type="text" id="kmPerLiter" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
 
       <label class="field-label" style="margin-top:6px;">Saved destinations</label>
-      <p class="fuel-hint" style="margin-bottom:8px;">Give the address or place name your son would enter in Waze — enter the one-way distance and it doubles it for the round trip.</p>
+      <p class="fuel-hint" style="margin-bottom:8px;">Tap a name or distance to change it. Distances are the full return trip.</p>
       <div id="destList"></div>
       <div class="add-dest">
         <input type="text" class="n1" id="newDestName" placeholder="Address or place name (e.g. Mara)">
-        <input type="text" class="n2" id="newDestKm" placeholder="One-way km" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
+        <input type="text" class="n2" id="newDestKm" placeholder="Return km" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
         <button id="addDestBtn">+</button>
       </div>
 
@@ -267,7 +273,7 @@
 
         <div class="driver-toggle" id="pastDriverToggle"></div>
 
-        <label class="field-label">Where did you drive to?</label>
+        <label class="field-label">Destination</label>
         <select id="pastDestSelect"></select>
 
         <div id="pastCustomBlock" style="display:none;">
@@ -288,6 +294,12 @@
       </div>
 
       <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+        <label class="field-label" style="font-size:12.5px; color:var(--text); font-weight:600; margin-bottom:10px;">Manage saved trips</label>
+        <p class="fuel-hint" style="margin-bottom:10px;">Delete any logged trip, including ones from months that have already closed.</p>
+        <div id="manageTripsList"></div>
+      </div>
+
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
         <button class="btn-primary" id="settingsSaveBtn">Save settings</button>
         <div id="settingsSavedNote" style="display:none; text-align:center; color:var(--a-color); font-size:12.5px; margin-top:8px;">Saved.</div>
       </div>
@@ -298,7 +310,7 @@
     </div>
   </div>
 
-  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 7 — 11 sept</strong></p>
+  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 11 — 11 sept</strong></p>
 
 </div>
 
@@ -311,9 +323,9 @@ function defaultData(){
     drivers: { a: 'Koen', b: 'Thijs' },
     settings: { fuelPrice: 1.95, kmPerLiter: 15 },
     destinations: [
-      { id: 'd1', name: 'Mara', oneWay: 40.5, km: 81 },
-      { id: 'd2', name: 'Werk', oneWay: 6.2, km: 12.4 },
-      { id: 'd3', name: 'Gym', oneWay: 3.3, km: 6.6 }
+      { id: 'd1', name: 'Mara', km: 81 },
+      { id: 'd2', name: 'Werk', km: 12.4 },
+      { id: 'd3', name: 'Gym', km: 6.6 }
     ],
     currentPeriod: null,
     trips: [],
@@ -374,18 +386,50 @@ function mergeIntoDefaults(parsed){
   return merged;
 }
 
-async function loadData(){
+async function fetchRemoteData(timeoutMs){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 6000);
   try{
-    const res = await fetch(FIREBASE_DB_URL + DATA_PATH);
+    const res = await fetch(FIREBASE_DB_URL + DATA_PATH, { signal: controller.signal });
     const json = await res.json();
-    data = json ? mergeIntoDefaults(json) : defaultData();
+    clearTimeout(timer);
+    if(json && !json.error) return json;
+    return null;
   }catch(e){
-    console.error('Could not load from Firebase, starting with defaults', e);
-    data = defaultData();
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+async function loadData(){
+  // Draw the interface straight away with sensible defaults, so the app is
+  // usable even if the network is slow or unreachable. Remote data is merged
+  // in a moment later, once it actually arrives.
+  data = defaultData();
+  data.currentPeriod = currentPeriodKey();
+  renderAll();
+
+  const remote = await fetchRemoteData(6000);
+  if(remote){
+    data = mergeIntoDefaults(remote);
+    setSyncStatus('');
+  } else {
+    setSyncStatus('offline');
   }
 
   handleMonthRollover();
   renderAll();
+}
+
+function setSyncStatus(state){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  if(state === 'offline'){
+    el.textContent = 'Offline — changes are not being shared right now.';
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 function handleMonthRollover(){
@@ -431,12 +475,12 @@ function scheduleRemoteSync(){
     if(isTyping || settingsOpen) return;
 
     try{
-      const res = await fetch(FIREBASE_DB_URL + DATA_PATH);
-      const json = await res.json();
+      const json = await fetchRemoteData(6000);
       if(json){
         data = mergeIntoDefaults(json);
         handleMonthRollover();
         renderAll();
+        setSyncStatus('');
       }
     }catch(e){
       // transient network hiccup — try again next cycle
@@ -735,6 +779,71 @@ function formatDateShort(iso){
   return d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
 }
 
+function deleteTrip(tripId, periodKey){
+  if(periodKey === '__current__'){
+    data.trips = data.trips.filter(t => t.id !== tripId);
+  } else if(data.history[periodKey]){
+    data.history[periodKey].trips = data.history[periodKey].trips.filter(t => t.id !== tripId);
+    if(data.history[periodKey].trips.length === 0){
+      delete data.history[periodKey];
+    }
+  }
+  saveData();
+  renderAll();
+}
+
+function renderManageTrips(){
+  const el = document.getElementById('manageTripsList');
+  if(!el) return;
+
+  const groups = [];
+  if(data.trips.length > 0){
+    groups.push({ key: '__current__', label: periodLabel(data.currentPeriod) + ' (current)', trips: data.trips });
+  }
+  Object.keys(data.history).sort().reverse().forEach(k => {
+    const trips = data.history[k].trips || [];
+    if(trips.length > 0) groups.push({ key: k, label: periodLabel(k), trips });
+  });
+
+  if(groups.length === 0){
+    el.innerHTML = `<div class="empty-state" style="padding:12px 0;">No trips logged yet.</div>`;
+    return;
+  }
+
+  el.innerHTML = groups.map(g => {
+    const sorted = [...g.trips].sort((a,b) => (b.date + b.id).localeCompare(a.date + a.id));
+    const rows = sorted.map(t => {
+      const name = t.driver === 'a' ? data.drivers.a : data.drivers.b;
+      const dot = t.driver === 'a' ? 'a' : 'b';
+      return `
+        <div class="log-item">
+          <div class="log-dot dot ${dot}"></div>
+          <div class="log-main">
+            <div class="log-dest">${escapeHtml(t.label)}</div>
+            <div class="log-meta">${escapeHtml(name)} · ${formatDateShort(t.date)}</div>
+          </div>
+          <div class="log-km">${fmtKm(t.km)}</div>
+          <button class="log-del" data-trip="${t.id}" data-period="${g.key}">×</button>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px; color:var(--text-dim); font-weight:600; margin-bottom:2px;">${escapeHtml(g.label)}</div>
+        ${rows}
+      </div>
+    `;
+  }).join('');
+
+  el.querySelectorAll('.log-del').forEach(btn => {
+    btn.onclick = () => {
+      if(confirm('Delete this trip? This cannot be undone.')){
+        deleteTrip(btn.dataset.trip, btn.dataset.period);
+      }
+    };
+  });
+}
+
 function renderDestList(){
   const el = document.getElementById('destList');
   if(data.destinations.length === 0){
@@ -743,20 +852,51 @@ function renderDestList(){
   }
   el.innerHTML = data.destinations.map(d => `
     <div class="dest-row">
-      <div class="dest-row-top">
-        <div class="name">${escapeHtml(d.name)}</div>
-        <div class="km-tag">${fmtKm(d.km)} km${d.oneWay ? ` <span style="opacity:.6;">(2× ${fmtKm(d.oneWay)})</span>` : ''}</div>
+      <div class="dest-edit-row">
+        <input type="text" class="dest-name-input" data-id="${d.id}" value="${escapeHtml(d.name)}">
+        <input type="text" class="dest-km-input" data-id="${d.id}" value="${fmtKm(d.km)}" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
+        <span class="km-unit">km</span>
         <button class="del" data-id="${d.id}">×</button>
       </div>
       <a class="waze-btn" href="${wazeUrl(d.name)}" target="_blank" rel="noopener">Check in Waze</a>
     </div>
   `).join('');
+
+  el.querySelectorAll('.dest-name-input').forEach(input => {
+    input.onchange = () => {
+      const d = data.destinations.find(x => x.id === input.dataset.id);
+      const newName = input.value.trim();
+      if(!d || !newName){ renderDestList(); return; }
+      d.name = newName;
+      saveData();
+      renderDestList();
+      renderDestSelect();
+      renderPastDestSelect();
+    };
+  });
+
+  el.querySelectorAll('.dest-km-input').forEach(input => {
+    input.onchange = () => {
+      const d = data.destinations.find(x => x.id === input.dataset.id);
+      const km = toNumber(input.value);
+      if(!d || !km || km <= 0){ renderDestList(); return; }
+      d.km = km;
+      delete d.oneWay;
+      saveData();
+      renderDestList();
+      renderDestSelect();
+      renderPastDestSelect();
+    };
+  });
+
   el.querySelectorAll('button.del').forEach(btn => {
     btn.onclick = () => {
+      if(!confirm('Delete this destination?')) return;
       data.destinations = data.destinations.filter(d => d.id !== btn.dataset.id);
       saveData();
       renderDestList();
       renderDestSelect();
+      renderPastDestSelect();
     };
   });
 }
@@ -795,6 +935,7 @@ function renderAll(){
   renderFuelPrice();
   renderPastDriverToggle();
   renderPastDestSelect();
+  renderManageTrips();
 }
 
 function todayIso(){
@@ -847,9 +988,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('addDestBtn').onclick = () => {
     const name = document.getElementById('newDestName').value.trim();
-    const oneWay = toNumber(document.getElementById('newDestKm').value);
-    if(!name || !oneWay || oneWay <= 0) return;
-    data.destinations.push({ id: uid(), name, oneWay, km: oneWay * 2 });
+    const km = toNumber(document.getElementById('newDestKm').value);
+    if(!name || !km || km <= 0) return;
+    data.destinations.push({ id: uid(), name, km });
     document.getElementById('newDestName').value = '';
     document.getElementById('newDestKm').value = '';
     saveData();
