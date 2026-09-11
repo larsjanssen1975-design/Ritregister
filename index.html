@@ -228,11 +228,12 @@
 
     <a id="wazeLink" class="waze-btn" href="#" target="_blank" rel="noopener">Open in Waze to check the km</a>
 
-    <label class="field-label">Kilometres</label>
+    <label class="field-label" id="kmLabel">Kilometres</label>
     <div class="km-display">
       <input type="text" id="kmInput" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0">
       <span class="suffix">km</span>
     </div>
+    <div class="fuel-hint" id="kmDoubleHint" style="display:none; margin-top:-4px; margin-bottom:10px;"></div>
 
     <label class="field-label">Date</label>
     <input type="date" id="dateInput">
@@ -301,11 +302,12 @@
           <input type="text" id="pastCustomLabel" placeholder="e.g. Airport run">
         </div>
 
-        <label class="field-label">Kilometres</label>
+        <label class="field-label" id="pastKmLabel">Kilometres</label>
         <div class="km-display">
           <input type="text" id="pastKmInput" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0">
           <span class="suffix">km</span>
         </div>
+        <div class="fuel-hint" id="pastKmDoubleHint" style="display:none; margin-top:-4px; margin-bottom:10px;"></div>
 
         <label class="field-label">Date</label>
         <input type="date" id="pastDateInput">
@@ -336,7 +338,7 @@
 
   <p class="signature">Geschreven door de beste Papa van de wereld<br><span class="signature-kicker">en oh ja — ook de sterkste!</span></p>
 
-  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 16 — 11 sept</strong></p>
+  <p class="footer-note">Trips and settings are shared between both phones.<br>Months reset automatically; past months stay saved above.<br><strong style="color:var(--accent);">versie 18 — 11 sept</strong></p>
 
 </div>
 
@@ -638,13 +640,16 @@ function wazeUrl(address){
 function updateWazeLink(){
   const sel = document.getElementById('destSelect');
   const link = document.getElementById('wazeLink');
-  let address = '';
-  if(sel.value === '__custom__'){
-    address = document.getElementById('customAddress').value.trim();
-  } else {
-    const d = data.destinations.find(x => x.id === sel.value);
-    address = d ? d.name : '';
+
+  // Only relevant for a one-off trip: saved destinations already have a
+  // known distance, so there is nothing to look up.
+  if(sel.value !== '__custom__'){
+    link.style.display = 'none';
+    return;
   }
+
+  const address = document.getElementById('customAddress').value.trim();
+  link.style.display = 'inline-flex';
   if(address){
     link.href = wazeUrl(address);
     link.style.opacity = '1';
@@ -680,6 +685,7 @@ function renderDestSelect(){
       const d = data.destinations.find(x => x.id === sel.value);
       if(d) document.getElementById('kmInput').value = d.km;
     }
+    updateKmMode();
     updateWazeLink();
   };
 
@@ -687,7 +693,57 @@ function renderDestSelect(){
     sel.value = data.destinations[0].id;
     document.getElementById('kmInput').value = data.destinations[0].km;
   }
+  updateKmMode();
   updateWazeLink();
+}
+
+// For a one-off trip the driver looks the distance up in Waze, which always
+// reports a single leg. So in that mode the field asks for the one-way figure
+// and the app doubles it. Saved destinations already store the return trip.
+function isCustomSelected(){
+  return document.getElementById('destSelect').value === '__custom__';
+}
+
+function updateKmMode(){
+  const custom = isCustomSelected();
+  const label = document.getElementById('kmLabel');
+  const hint = document.getElementById('kmDoubleHint');
+  if(!label || !hint) return;
+  label.textContent = custom ? 'Kilometres one way (as shown in Waze)' : 'Kilometres (return)';
+  if(custom){
+    const oneWay = toNumber(document.getElementById('kmInput').value);
+    if(oneWay > 0){
+      hint.textContent = `Return trip: ${fmtKm(oneWay * 2)} km — this is what gets logged.`;
+    } else {
+      hint.textContent = 'Waze shows one way only; the return trip is counted automatically.';
+    }
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+function isPastCustomSelected(){
+  return document.getElementById('pastDestSelect').value === '__custom__';
+}
+
+function updatePastKmMode(){
+  const custom = isPastCustomSelected();
+  const label = document.getElementById('pastKmLabel');
+  const hint = document.getElementById('pastKmDoubleHint');
+  if(!label || !hint) return;
+  label.textContent = custom ? 'Kilometres one way (as shown in Waze)' : 'Kilometres (return)';
+  if(custom){
+    const oneWay = toNumber(document.getElementById('pastKmInput').value);
+    if(oneWay > 0){
+      hint.textContent = `Return trip: ${fmtKm(oneWay * 2)} km — this is what gets logged.`;
+    } else {
+      hint.textContent = 'Waze shows one way only; the return trip is counted automatically.';
+    }
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+  }
 }
 
 function renderPastDriverToggle(){
@@ -724,12 +780,14 @@ function renderPastDestSelect(){
       const d = data.destinations.find(x => x.id === sel.value);
       if(d) document.getElementById('pastKmInput').value = d.km;
     }
+    updatePastKmMode();
   };
 
   if(data.destinations.length > 0){
     sel.value = data.destinations[0].id;
     document.getElementById('pastKmInput').value = data.destinations[0].km;
   }
+  updatePastKmMode();
 }
 
 function renderTripLog(){
@@ -875,7 +933,6 @@ function renderDestList(){
         <span class="km-unit">km</span>
         <button class="del" data-id="${d.id}">×</button>
       </div>
-      <a class="waze-btn" href="${wazeUrl(d.name)}" target="_blank" rel="noopener">Check in Waze</a>
     </div>
   `).join('');
 
@@ -973,18 +1030,22 @@ function yesterdayIso(){
 document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dateInput').value = todayIso();
   document.getElementById('customAddress').oninput = updateWazeLink;
+  document.getElementById('kmInput').oninput = updateKmMode;
+  document.getElementById('pastKmInput').oninput = updatePastKmMode;
 
   document.getElementById('addTripBtn').onclick = () => {
-    const km = toNumber(document.getElementById('kmInput').value);
-    if(!km || km <= 0){
+    const entered = toNumber(document.getElementById('kmInput').value);
+    if(!entered || entered <= 0){
       document.getElementById('kmInput').focus();
       return;
     }
     const sel = document.getElementById('destSelect');
     let label;
+    let km = entered;
     if(sel.value === '__custom__'){
       const addr = document.getElementById('customAddress').value.trim();
       label = addr || 'Custom trip';
+      km = entered * 2; // Waze reports one way; log the return trip
     } else {
       const d = data.destinations.find(x => x.id === sel.value);
       label = d ? d.name : 'Trip';
@@ -1019,8 +1080,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('pastDateInput').value = yesterdayIso();
 
   document.getElementById('addPastTripBtn').onclick = () => {
-    const km = toNumber(document.getElementById('pastKmInput').value);
-    if(!km || km <= 0){
+    const entered = toNumber(document.getElementById('pastKmInput').value);
+    if(!entered || entered <= 0){
       document.getElementById('pastKmInput').focus();
       return;
     }
@@ -1031,9 +1092,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const sel = document.getElementById('pastDestSelect');
     let label;
+    let km = entered;
     if(sel.value === '__custom__'){
       const desc = document.getElementById('pastCustomLabel').value.trim();
       label = desc || 'Past trip';
+      km = entered * 2; // Waze reports one way; log the return trip
     } else {
       const d = data.destinations.find(x => x.id === sel.value);
       label = d ? d.name : 'Trip';
