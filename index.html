@@ -16,10 +16,10 @@
     --text:#f1eee6;
     --text-dim:#8d96a3;
     --accent:#e8a93a;
-    --a-color:#49b7a8;
-    --a-dim:#173430;
-    --b-color:#e0705a;
-    --b-dim:#3a2420;
+    --a-color:#e5534b;
+    --a-dim:#3a2119;
+    --b-color:#4caf6b;
+    --b-dim:#183324;
     --waze-color:#7fb8e8;
     --radius:14px;
   }
@@ -76,7 +76,16 @@
   .driver-toggle button.active-a{border-color:var(--a-color);background:var(--a-dim);}
   .driver-toggle button.active-b{border-color:var(--b-color);background:var(--b-dim);}
 
-  select, input[type=text], input[type=number], input[type=date]{
+  select{
+    width:100%;background-color:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    font-family:inherit;font-size:15px;padding:11px 36px 11px 12px;border-radius:10px;margin-bottom:10px;
+    appearance:none;-webkit-appearance:none;
+    background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="%238d96a3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l5 5 5-5"/></svg>');
+    background-repeat:no-repeat;
+    background-position: right 12px center;
+    background-size:13px;
+  }
+  input[type=text], input[type=number], input[type=date]{
     width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
     font-family:inherit;font-size:15px;padding:11px 12px;border-radius:10px;margin-bottom:10px;
     appearance:none;-webkit-appearance:none;
@@ -162,6 +171,11 @@
     <p>Log every trip, split the fuel fairly. No more arguing over who drove more.</p>
   </header>
 
+  <div class="card" id="whoCard">
+    <h2>Who's driving?</h2>
+    <div class="driver-toggle" id="driverToggle"></div>
+  </div>
+
   <div class="period-label" id="periodLabel"></div>
   <div class="balance" id="balanceCard"></div>
 
@@ -169,7 +183,7 @@
     <h2>Fuel price</h2>
     <div class="km-display">
       <span class="suffix">€</span>
-      <input type="number" step="0.01" id="fuelPriceMain" inputmode="decimal">
+      <input type="text" id="fuelPriceMain" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
       <span class="suffix">per litre</span>
     </div>
     <div class="fuel-hint" id="fuelPriceHint"></div>
@@ -177,7 +191,6 @@
 
   <div class="card">
     <h2>Log a trip</h2>
-    <div class="driver-toggle" id="driverToggle"></div>
 
     <label class="field-label">Where did you drive to?</label>
     <select id="destSelect"></select>
@@ -191,7 +204,7 @@
 
     <label class="field-label">Kilometres</label>
     <div class="km-display">
-      <input type="number" id="kmInput" inputmode="decimal" placeholder="0">
+      <input type="text" id="kmInput" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0">
       <span class="suffix">km</span>
     </div>
 
@@ -222,15 +235,41 @@
       </div>
 
       <label class="field-label">Car's fuel economy (km per litre)</label>
-      <input type="number" step="0.5" id="kmPerLiter" inputmode="decimal">
+      <input type="text" id="kmPerLiter" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
 
       <label class="field-label" style="margin-top:6px;">Saved destinations</label>
       <p class="fuel-hint" style="margin-bottom:8px;">Give the address or place name your son would enter in Waze — enter the one-way distance and it doubles it for the round trip.</p>
       <div id="destList"></div>
       <div class="add-dest">
         <input type="text" class="n1" id="newDestName" placeholder="Address or place name (e.g. Mara)">
-        <input type="number" class="n2" id="newDestKm" placeholder="One-way km" inputmode="decimal">
+        <input type="text" class="n2" id="newDestKm" placeholder="One-way km" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
         <button id="addDestBtn">+</button>
+      </div>
+
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+        <label class="field-label" style="font-size:12.5px; color:var(--text); font-weight:600; margin-bottom:10px;">Add a past trip</label>
+        <p class="fuel-hint" style="margin-bottom:10px;">For a trip you forgot to log earlier — it's filed under the right month automatically, even if that month has already closed.</p>
+
+        <div class="driver-toggle" id="pastDriverToggle"></div>
+
+        <label class="field-label">Where did you drive to?</label>
+        <select id="pastDestSelect"></select>
+
+        <div id="pastCustomBlock" style="display:none;">
+          <label class="field-label">Description</label>
+          <input type="text" id="pastCustomLabel" placeholder="e.g. Airport run">
+        </div>
+
+        <label class="field-label">Kilometres</label>
+        <div class="km-display">
+          <input type="text" id="pastKmInput" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0">
+          <span class="suffix">km</span>
+        </div>
+
+        <label class="field-label">Date</label>
+        <input type="date" id="pastDateInput">
+
+        <button class="btn-secondary" id="addPastTripBtn">Add past trip</button>
       </div>
 
       <div style="margin-top:18px;">
@@ -263,9 +302,35 @@ function defaultData(){
 
 let data = null;
 let selectedDriver = 'a';
+let selectedPastDriver = 'a';
+const SELECTED_DRIVER_KEY = 'ritregister-selected-driver';
+
+async function loadSelectedDriver(){
+  try{
+    const res = await window.storage.get(SELECTED_DRIVER_KEY, false);
+    if(res && res.value && (res.value === 'a' || res.value === 'b')){
+      selectedDriver = res.value;
+    }
+  }catch(e){
+    // nothing saved yet on this phone — keep the default
+  }
+}
+
+async function saveSelectedDriver(){
+  try{
+    await window.storage.set(SELECTED_DRIVER_KEY, selectedDriver, false);
+  }catch(e){
+    console.error('Could not save selected driver', e);
+  }
+}
 let idCounter = 1;
 
 function uid(){ idCounter += 1; return 't' + Date.now() + idCounter; }
+
+function toNumber(str){
+  if(str == null) return NaN;
+  return parseFloat(String(str).trim().replace(',', '.'));
+}
 
 function currentPeriodKey(){
   return todayIso().slice(0,7); // YYYY-MM
@@ -317,6 +382,23 @@ function handleMonthRollover(){
   }
 }
 
+function scheduleLiveMonthRolloverCheck(){
+  // Catches the moment midnight passes if the app is left open across a month
+  // boundary. Every trip a person actually logs is already filed under its own
+  // date's month regardless of this timer — this just keeps an open screen
+  // in sync without needing a manual refresh.
+  setInterval(() => {
+    if(!data) return;
+    const nowKey = currentPeriodKey();
+    if(data.currentPeriod !== nowKey){
+      archiveCurrentMonth(data.currentPeriod);
+      data.currentPeriod = nowKey;
+      saveData();
+      renderAll();
+    }
+  }, 60000);
+}
+
 function archiveCurrentMonth(periodKey){
   if(data.trips.length === 0) return;
   const cpk = costPerKm();
@@ -340,6 +422,22 @@ function costPerKm(){
   const s = data.settings;
   if(!s.kmPerLiter) return 0;
   return s.fuelPrice / s.kmPerLiter;
+}
+
+function periodKeyFromDate(dateStr){
+  return (dateStr || todayIso()).slice(0,7);
+}
+
+function addTripRecord(trip){
+  const period = periodKeyFromDate(trip.date);
+  if(period === data.currentPeriod){
+    data.trips.push(trip);
+  } else {
+    if(!data.history[period]){
+      data.history[period] = { trips: [], costPerKm: costPerKm() };
+    }
+    data.history[period].trips.push(trip);
+  }
 }
 
 function totalsFor(trips){
@@ -404,8 +502,8 @@ function renderDriverToggle(){
     <button id="btnDriverA" class="${selectedDriver==='a' ? 'active-a' : ''}"><span class="dot a"></span>${escapeHtml(data.drivers.a)}</button>
     <button id="btnDriverB" class="${selectedDriver==='b' ? 'active-b' : ''}"><span class="dot b"></span>${escapeHtml(data.drivers.b)}</button>
   `;
-  document.getElementById('btnDriverA').onclick = () => { selectedDriver = 'a'; renderDriverToggle(); };
-  document.getElementById('btnDriverB').onclick = () => { selectedDriver = 'b'; renderDriverToggle(); };
+  document.getElementById('btnDriverA').onclick = () => { selectedDriver = 'a'; renderDriverToggle(); saveSelectedDriver(); };
+  document.getElementById('btnDriverB').onclick = () => { selectedDriver = 'b'; renderDriverToggle(); saveSelectedDriver(); };
 }
 
 function wazeUrl(address){
@@ -444,7 +542,7 @@ function renderDestSelect(){
   });
   const custom = document.createElement('option');
   custom.value = '__custom__';
-  custom.textContent = 'Other (enter km manually)';
+  custom.textContent = 'Andere rit';
   sel.appendChild(custom);
 
   sel.onchange = () => {
@@ -465,6 +563,48 @@ function renderDestSelect(){
     document.getElementById('kmInput').value = data.destinations[0].km;
   }
   updateWazeLink();
+}
+
+function renderPastDriverToggle(){
+  const el = document.getElementById('pastDriverToggle');
+  el.innerHTML = `
+    <button id="pastBtnDriverA" class="${selectedPastDriver==='a' ? 'active-a' : ''}"><span class="dot a"></span>${escapeHtml(data.drivers.a)}</button>
+    <button id="pastBtnDriverB" class="${selectedPastDriver==='b' ? 'active-b' : ''}"><span class="dot b"></span>${escapeHtml(data.drivers.b)}</button>
+  `;
+  document.getElementById('pastBtnDriverA').onclick = () => { selectedPastDriver = 'a'; renderPastDriverToggle(); };
+  document.getElementById('pastBtnDriverB').onclick = () => { selectedPastDriver = 'b'; renderPastDriverToggle(); };
+}
+
+function renderPastDestSelect(){
+  const sel = document.getElementById('pastDestSelect');
+  sel.innerHTML = '';
+  data.destinations.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = `${d.name} — ${fmtKm(d.km)} km`;
+    sel.appendChild(opt);
+  });
+  const custom = document.createElement('option');
+  custom.value = '__custom__';
+  custom.textContent = 'Andere rit';
+  sel.appendChild(custom);
+
+  sel.onchange = () => {
+    const customBlock = document.getElementById('pastCustomBlock');
+    if(sel.value === '__custom__'){
+      customBlock.style.display = 'block';
+      document.getElementById('pastKmInput').value = '';
+    } else {
+      customBlock.style.display = 'none';
+      const d = data.destinations.find(x => x.id === sel.value);
+      if(d) document.getElementById('pastKmInput').value = d.km;
+    }
+  };
+
+  if(data.destinations.length > 0){
+    sel.value = data.destinations[0].id;
+    document.getElementById('pastKmInput').value = data.destinations[0].km;
+  }
 }
 
 function renderTripLog(){
@@ -605,6 +745,8 @@ function renderAll(){
   renderDestList();
   renderSettingsFields();
   renderFuelPrice();
+  renderPastDriverToggle();
+  renderPastDestSelect();
 }
 
 function todayIso(){
@@ -614,12 +756,20 @@ function todayIso(){
   return local.toISOString().slice(0,10);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function yesterdayIso(){
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off*60000);
+  return local.toISOString().slice(0,10);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dateInput').value = todayIso();
   document.getElementById('customAddress').oninput = updateWazeLink;
 
   document.getElementById('addTripBtn').onclick = () => {
-    const km = parseFloat(document.getElementById('kmInput').value);
+    const km = toNumber(document.getElementById('kmInput').value);
     if(!km || km <= 0){
       document.getElementById('kmInput').focus();
       return;
@@ -635,10 +785,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const date = document.getElementById('dateInput').value || todayIso();
 
-    data.trips.push({ id: uid(), driver: selectedDriver, label, km, date });
+    addTripRecord({ id: uid(), driver: selectedDriver, label, km, date });
     saveData();
     document.getElementById('kmInput').value = '';
     document.getElementById('customAddress').value = '';
+    document.getElementById('dateInput').value = todayIso();
     if(sel.value !== '__custom__'){
       const d = data.destinations.find(x => x.id === sel.value);
       if(d) document.getElementById('kmInput').value = d.km;
@@ -648,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('addDestBtn').onclick = () => {
     const name = document.getElementById('newDestName').value.trim();
-    const oneWay = parseFloat(document.getElementById('newDestKm').value);
+    const oneWay = toNumber(document.getElementById('newDestKm').value);
     if(!name || !oneWay || oneWay <= 0) return;
     data.destinations.push({ id: uid(), name, oneWay, km: oneWay * 2 });
     document.getElementById('newDestName').value = '';
@@ -656,17 +807,53 @@ document.addEventListener('DOMContentLoaded', () => {
     saveData();
     renderDestList();
     renderDestSelect();
+    renderPastDestSelect();
+  };
+
+  document.getElementById('pastDateInput').value = yesterdayIso();
+
+  document.getElementById('addPastTripBtn').onclick = () => {
+    const km = toNumber(document.getElementById('pastKmInput').value);
+    if(!km || km <= 0){
+      document.getElementById('pastKmInput').focus();
+      return;
+    }
+    const dateVal = document.getElementById('pastDateInput').value;
+    if(!dateVal){
+      document.getElementById('pastDateInput').focus();
+      return;
+    }
+    const sel = document.getElementById('pastDestSelect');
+    let label;
+    if(sel.value === '__custom__'){
+      const desc = document.getElementById('pastCustomLabel').value.trim();
+      label = desc || 'Past trip';
+    } else {
+      const d = data.destinations.find(x => x.id === sel.value);
+      label = d ? d.name : 'Trip';
+    }
+
+    addTripRecord({ id: uid(), driver: selectedPastDriver, label, km, date: dateVal });
+    saveData();
+    document.getElementById('pastKmInput').value = '';
+    document.getElementById('pastCustomLabel').value = '';
+    document.getElementById('pastDateInput').value = yesterdayIso();
+    if(sel.value !== '__custom__'){
+      const d = data.destinations.find(x => x.id === sel.value);
+      if(d) document.getElementById('pastKmInput').value = d.km;
+    }
+    renderAll();
   };
 
   document.getElementById('nameA').onchange = (e) => { data.drivers.a = e.target.value.trim() || 'Koen'; saveData(); renderAll(); };
   document.getElementById('nameB').onchange = (e) => { data.drivers.b = e.target.value.trim() || 'Thijs'; saveData(); renderAll(); };
   document.getElementById('fuelPriceMain').onchange = (e) => {
-    data.settings.fuelPrice = parseFloat(e.target.value) || 0;
+    data.settings.fuelPrice = toNumber(e.target.value) || 0;
     data.settings.fuelPriceUpdated = todayIso();
     saveData();
     renderAll();
   };
-  document.getElementById('kmPerLiter').onchange = (e) => { data.settings.kmPerLiter = parseFloat(e.target.value) || 0; saveData(); renderAll(); };
+  document.getElementById('kmPerLiter').onchange = (e) => { data.settings.kmPerLiter = toNumber(e.target.value) || 0; saveData(); renderAll(); };
 
   document.getElementById('endMonthBtn').onclick = () => {
     if(data.trips.length === 0){
@@ -680,7 +867,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  await loadSelectedDriver();
   loadData();
+  scheduleLiveMonthRolloverCheck();
 });
 </script>
 </body>
